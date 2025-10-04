@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ email.subject }} - Email Support Agent{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <!-- Back Button -->
+    <div class="mb-3">
+        <a href="{% url 'dashboard:inbox' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Inbox
+        </a>
+    </div>
+    
+    <div class="row g-4">
+        <!-- Email Content -->
+        <div class="col-md-8">
+            <!-- Email Header -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">{{ email.subject }}</h5>
+                            <small class="text-muted">
+                                From: <strong>{{ email.from_name|default:email.from_email }}</strong>
+                                ({{ email.from_email }})
+                            </small>
+                        </div>
+                        <span class="badge bg-{{ email.get_status_display|lower }}-subtle text-{{ email.get_status_display|lower }} fs-6">
+                            {{ email.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i> {{ email.received_at|date:"F d, Y - g:i A" }}
+                        </small>
+                    </div>
+                    
+                    <div class="email-body" style="white-space: pre-wrap;">{{ email.body }}</div>
+                    
+                    {% if email.has_attachments %}
+                        <hr>
+                        <div>
+                            <strong><i class="bi bi-paperclip"></i> Attachments:</strong>
+                            <ul class="list-unstyled mt-2">
+                                {% for attachment in email.attachments_data %}
+                                    <li>
+                                        <i class="bi bi-file-earmark"></i>
+                                        {{ attachment.filename }}
+                                        <small class="text-muted">({{ attachment.size|filesizeformat }})</small>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- AI-Generated Replies -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-robot"></i> AI-Generated Replies
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if replies %}
+                        {% for reply in replies %}
+                            <div class="card mb-3 {% if reply.status == 'approved' %}border-success{% elif reply.status == 'rejected' %}border-danger{% endif %}">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-{{ reply.source }}-subtle">
+                                            {{ reply.get_source_display }}
+                                        </span>
+                                        <span class="badge bg-{{ reply.status }}-subtle">
+                                            {{ reply.get_status_display }}
+                                        </span>
+                                        {% if reply.ai_confidence %}
+                                            <span class="badge bg-info">
+                                                Confidence: {{ reply.ai_confidence|floatformat:0|mul:100 }}%
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ reply.created_at|date:"M d, Y - g:i A" }}
+                                    </small>
+                                </div>
+                                <div class="card-body">
+                                    <div class="reply-content mb-3" style="white-space: pre-wrap;">{{ reply.body }}</div>
+                                    
+                                    {% if reply.status == 'draft' or reply.status == 'pending_approval' %}
+                                        <!-- Action Buttons -->
+                                        <div class="d-flex gap-2">
+                                            <form method="post" action="{% url 'dashboard:approve_reply' reply.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="send_now" value="false">
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="bi bi-check-circle"></i> Approve
+                                                </button>
+                                            </form>
+                                            
+                                            <form method="post" action="{% url 'dashboard:approve_reply' reply.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="send_now" value="true">
+                                                <button type="submit" class="btn btn-primary btn-sm">
+                                                    <i class="bi bi-send"></i> Approve & Send
+                                                </button>
+                                            </form>
+                                            
+                                            <button type="button" class="btn btn-warning btn-sm" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editReplyModal{{ reply.id }}">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
+                                            
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#rejectReplyModal{{ reply.id }}">
+                                                <i class="bi bi-x-circle"></i> Reject
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Edit Modal -->
+                                        <div class="modal fade" id="editReplyModal{{ reply.id }}" tabindex="-1">
+                                            <div class="modal-dialog modal-lg">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Edit Reply</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form method="post" action="{% url 'dashboard:approve_reply' reply.id %}">
+                                                        {% csrf_token %}
+                                                        <div class="modal-body">
+                                                            <textarea class="form-control" rows="10" name="modified_body">{{ reply.body }}</textarea>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary" name="send_now" value="false">
+                                                                Save Changes
+                                                            </button>
+                                                            <button type="submit" class="btn btn-success" name="send_now" value="true">
+                                                                Save & Send
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Reject Modal -->
+                                        <div class="modal fade" id="rejectReplyModal{{ reply.id }}" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Reject Reply</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form method="post" action="{% url 'dashboard:reject_reply' reply.id %}">
+                                                        {% csrf_token %}
+                                                        <div class="modal-body">
+                                                            <label class="form-label">Reason for rejection (optional):</label>
+                                                            <textarea class="form-control" rows="3" name="notes"></textarea>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-danger">Reject</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% elif reply.status == 'approved' %}
+                                        <div class="alert alert-success mb-0">
+                                            <i class="bi bi-check-circle"></i>
+                                            Approved by {{ reply.reviewed_by.get_full_name }}
+                                            on {{ reply.reviewed_at|date:"M d, Y - g:i A" }}
+                                            {% if reply.sent_at %}
+                                                <br>Sent on {{ reply.sent_at|date:"M d, Y - g:i A" }}
+                                            {% endif %}
+                                        </div>
+                                    {% elif reply.status == 'rejected' %}
+                                        <div class="alert alert-danger mb-0">
+                                            <i class="bi bi-x-circle"></i>
+                                            Rejected by {{ reply.reviewed_by.get_full_name }}
+                                            {% if reply.review_notes %}

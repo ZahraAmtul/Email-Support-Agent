@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block title %}Inbox - Email Support Agent{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Inbox</h1>
+        
+        <!-- Filters -->
+        <form method="get" class="d-flex gap-2">
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="">All Status</option>
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if value == status_filter %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+            
+            <select name="category" class="form-select" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                {% for category in categories %}
+                    <option value="{{ category.name }}" 
+                            {% if category.name == category_filter %}selected{% endif %}>
+                        {{ category.get_name_display }}
+                    </option>
+                {% endfor %}
+            </select>
+            
+            <input type="text" name="q" class="form-control" placeholder="Search..." 
+                   value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i>
+            </button>
+        </form>
+    </div>
+    
+    <!-- Email List -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            {% if page_obj %}
+                {% for email in page_obj %}
+                    <div class="email-item p-3 border-bottom priority-{{ email.priority }}"
+                         onclick="window.location.href='{% url 'dashboard:email_detail' email.id %}'">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <strong>{{ email.from_name|default:email.from_email }}</strong>
+                                    
+                                    <span class="badge badge-status bg-{{ email.get_status_display|lower }}-subtle text-{{ email.get_status_display|lower }}">
+                                        {{ email.get_status_display }}
+                                    </span>
+                                    
+                                    {% if email.category %}
+                                        <span class="badge bg-secondary">
+                                            {{ email.category.get_name_display }}
+                                        </span>
+                                    {% endif %}
+                                    
+                                    {% if email.requires_escalation %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-exclamation-triangle"></i> Escalated
+                                        </span>
+                                    {% endif %}
+                                    
+                                    {% if email.ai_sentiment == 'negative' %}
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-emoji-frown"></i> Negative
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="text-dark mb-1">
+                                    {{ email.subject }}
+                                </div>
+                                
+                                <small class="text-muted">
+                                    {{ email.body|truncatewords:15 }}
+                                </small>
+                            </div>
+                            
+                            <div class="text-end text-muted" style="min-width: 120px;">
+                                <small>
+                                    <i class="bi bi-clock"></i>
+                                    {{ email.received_at|timesince }} ago
+                                </small>
+                                {% if email.has_attachments %}
+                                    <br><i class="bi bi-paperclip"></i>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-inbox" style="font-size: 64px;"></i>
+                    <p class="mt-3">No emails found</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}

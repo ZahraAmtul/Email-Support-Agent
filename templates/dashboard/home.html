@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Email Support Agent{% endblock %}
+
+{% block content %}
+<div class="py-4">
+    <h1 class="mb-4">Dashboard Overview</h1>
+    
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Total Emails</p>
+                            <h2 class="mb-0">{{ total_emails }}</h2>
+                        </div>
+                        <div class="text-primary" style="font-size: 48px;">
+                            <i class="bi bi-envelope"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">New</p>
+                            <h2 class="mb-0">{{ new_emails }}</h2>
+                        </div>
+                        <div class="text-info" style="font-size: 48px;">
+                            <i class="bi bi-inbox-fill"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Pending Review</p>
+                            <h2 class="mb-0">{{ pending_review }}</h2>
+                        </div>
+                        <div class="text-warning" style="font-size: 48px;">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Escalated</p>
+                            <h2 class="mb-0">{{ escalated }}</h2>
+                        </div>
+                        <div class="text-danger" style="font-size: 48px;">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Weekly Performance -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">AI Performance (Last 7 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h3 class="text-primary">{{ week_totals.emails_received }}</h3>
+                            <small class="text-muted">Emails Received</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 class="text-success">{{ week_totals.emails_replied }}</h3>
+                            <small class="text-muted">Emails Replied</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 class="text-info">{{ week_totals.ai_approved }}</h3>
+                            <small class="text-muted">AI Auto-Handled</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 class="text-warning">{{ week_totals.time_saved|floatformat:1 }}h</h3>
+                            <small class="text-muted">Time Saved</small>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="text-center">
+                        <h2 class="text-success mb-0">{{ automation_rate }}%</h2>
+                        <p class="text-muted mb-0">Automation Rate</p>
+                        <div class="progress mt-2" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ automation_rate }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'dashboard:inbox' %}?status=new" 
+                       class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-inbox"></i> View New Emails
+                    </a>
+                    <a href="{% url 'dashboard:inbox' %}?status=pending_review" 
+                       class="btn btn-warning w-100 mb-2">
+                        <i class="bi bi-clock"></i> Review Pending
+                    </a>
+                    <a href="{% url 'dashboard:inbox' %}?status=escalated" 
+                       class="btn btn-danger w-100 mb-2">
+                        <i class="bi bi-exclamation-triangle"></i> Handle Escalations
+                    </a>
+                    <a href="{% url 'dashboard:analytics' %}" 
+                       class="btn btn-info w-100">
+                        <i class="bi bi-graph-up"></i> View Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Daily Trend Chart -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Weekly Trend</h5>
+        </div>
+        <div class="card-body">
+            <canvas id="trendChart" height="80"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Trend Chart
+    const ctx = document.getElementById('trendChart');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [
+                {% for metric in recent_metrics reversed %}
+                    '{{ metric.date|date:"M d" }}',
+                {% endfor %}
+            ],
+            datasets: [
+                {
+                    label: 'Emails Received',
+                    data: [
+                        {% for metric in recent_metrics reversed %}
+                            {{ metric.total_emails_received }},
+                        {% endfor %}
+                    ],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                },
+                {
+                    label: 'AI Auto-Handled',
+                    data: [
+                        {% for metric in recent_metrics reversed %}
+                            {{ metric.ai_approved_replies }},
+                        {% endfor %}
+                    ],
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
